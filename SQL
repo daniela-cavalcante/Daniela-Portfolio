@@ -1,1 +1,160 @@
+use chinook;
 
+SELECT * FROM album;
+
+SELECT DISTINCT
+album.title
+FROM album;
+
+SELECT DISTINCT
+artist.name
+FROM artist;
+
+SELECT 
+	album.title AS album_title,
+	artist.name AS artist_name
+FROM artist
+	LEFT JOIN album
+    ON artist.ArtistId = album.ArtistId;
+    
+SELECT* FROM customer;
+
+SELECT* FROM employee;
+
+SELECT* FROM genre;
+
+SELECT* FROM invoice;
+
+SELECT * FROM invoiceline;
+
+SELECT DISTINCT
+	unitprice
+FROM invoiceline;
+
+SELECT * FROM mediatype;
+
+SELECT * FROM playlist;
+
+SELECT * FROM playlisttrack;
+
+SELECT* FROM track;
+
+-- Identifying the top 5 genres based on the total number of tracks sold:
+
+SELECT
+	genre.name AS genre_name,
+    COUNT(invoiceline.trackid) AS total_tracks_sold
+FROM genre
+	INNER JOIN track
+		ON track.genreid = genre.genreid
+	INNER JOIN	invoiceline
+		ON invoiceline.trackid = track.trackid
+GROUP BY genre_name
+ORDER BY total_tracks_sold DESC
+LIMIT 5;
+
+SELECT * FROM customer;
+
+-- Identifying the top 10 customers who have spent the most money
+
+SELECT
+	customer.customerId,
+    customer.firstname,
+    customer.lastname,
+    SUM(invoiceline.unitprice * invoiceline.quantity) AS total_spent
+FROM customer
+	JOIN invoice
+		ON invoice.customerid = customer.customerid
+	JOIN invoiceline
+		ON invoiceline.invoiceid = invoice.invoiceid
+GROUP BY customer.customerId
+ORDER BY total_spent DESC
+LIMIT 10;
+
+-- Identifying which genres have the most tracks in the inventory (but haven't necessarily sold the most)?
+
+SELECT 
+	genre.name AS genre_name,
+    COUNT(track.trackid) AS total_tracks
+FROM genre
+	JOIN track
+		ON track.genreid = genre.genreid
+GROUP BY genre_name
+ORDER BY total_tracks DESC;
+
+-- Identifying the top 5 countries (by total spent) where the customers are located
+
+SELECT
+	customer.country AS top_5_countries,
+    SUM(invoiceline.unitprice * invoiceline.quantity) AS total_spent
+FROM customer
+	JOIN invoice
+		ON invoice.customerid = customer.customerid
+	JOIN invoiceline
+		ON invoiceline.invoiceid = invoice.invoiceid
+GROUP BY top_5_countries
+ORDER BY total_spent DESC
+LIMIT 5;
+    
+-- Identifying the artists with the most tracks and the total sales for this artist's albums.
+
+SELECT
+	artist.artistid,
+    artist.name,
+    COUNT(invoiceline.trackid) AS total_tracks,
+    SUM(invoiceline.unitprice * invoiceline.quantity) AS total_sales
+FROM artist
+	JOIN album
+		ON album.artistid = artist.artistid
+	JOIN track
+		ON track.albumid = album.albumid
+	LEFT JOIN invoiceline
+		ON invoiceline.trackid = track.trackid
+GROUP BY artist.artistid, artist.name
+ORDER BY total_tracks DESC;    
+
+--  Top 5 tracks that customers are really enjoying despite their length:
+
+SELECT 
+	track.trackid,
+    track.name AS top_5_tracks,
+    artist.name AS artist_name,
+    album.title AS album_title,
+    genre.name AS genre_name,
+    SUM(invoiceline.unitprice * invoiceline.quantity) AS total_sales
+FROM track
+	JOIN album
+		ON album.albumid = track.albumid
+	JOIN artist
+		ON artist.artistid = album.artistid
+    JOIN invoiceline
+		ON invoiceline.trackid = track.trackid
+	JOIN genre
+		ON genre.genreid = track.genreid
+GROUP BY track.trackid, track.name
+HAVING AVG(track.milliseconds) > 300000
+ORDER BY total_sales DESC
+LIMIT 5;
+    
+-- Comparing the average sales amount for invoices created on weekdays vs. weekends & the total number of invoices for each category
+
+SELECT
+    CASE
+        WHEN DAYOFWEEK(invoice.invoicedate) IN (1, 7) THEN 'Weekend'
+        ELSE 'Weekday'
+    END AS invoice_day_category,
+    COUNT(*) AS total_invoices,
+    AVG(total_sales) AS average_sales_amount
+FROM (
+    SELECT
+        invoiceline.invoiceid,
+        SUM(invoiceline.unitprice * invoiceline.quantity) AS total_sales
+    FROM
+        invoiceline
+    GROUP BY
+        invoiceline.invoiceid
+) AS invoice_totals
+	JOIN invoice 
+		ON invoice_totals.invoiceid = invoice.invoiceid
+GROUP BY
+    invoice_day_category;
